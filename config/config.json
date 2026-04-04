@@ -1,0 +1,58 @@
+{
+  "ciudad": {
+    "filas": ["A", "B", "C", "D"],
+    "columnas": [1, 2, 3, 4, 5],
+    "total_intersecciones": 20
+  },
+  "red": {
+    "pc1_ip": "192.168.1.10",
+    "pc2_ip": "192.168.1.20",
+    "pc3_ip": "192.168.1.30",
+    "puertos": {
+      "broker_sub":  5554,
+      "broker_pub":  5555,
+      "analitica_push_semaforos": 5556,
+      "analitica_push_bd":        5557,
+      "analitica_push_replica":   5558,
+      "bd_principal_pull":        5557,
+      "bd_replica_pull":          5558,
+      "monitoreo_rep":            5560,
+      "analitica_rep":            5561,
+      "health_check":             5562
+    }
+  },
+  "sensores": {
+    "intervalo_segundos": 5,
+    "camara": {
+      "volumen_min": 0,
+      "volumen_max": 30,
+      "velocidad_min": 5,
+      "velocidad_max": 60
+    },
+    "espira": {
+      "vehiculos_min": 0,
+      "vehiculos_max": 40,
+      "intervalo_conteo_seg": 30
+    },
+    "gps": {
+      "velocidad_min": 5,
+      "velocidad_max": 60
+    }
+  },
+  "semaforos": {
+    "tiempo_verde_normal_seg": 15,
+    "tiempo_verde_congestion_seg": 30,
+    "tiempo_verde_priorizacion_seg": 60
+  },
+  "reglas": {
+    "normal":      { "Q_max": 5,  "Vp_min": 35, "V_max": 20 },
+    "congestion":  { "Q_min": 5,  "Vp_max": 35, "V_min": 20 },
+    "priorizacion": "comando_manual"
+  },
+  "base_datos": {
+    "nombre_principal": "trafico_principal.db",
+    "nombre_replica":   "trafico_replica.db",
+    "health_check_intervalo_seg": 3,
+    "health_check_timeout_seg":   6
+  }
+}
