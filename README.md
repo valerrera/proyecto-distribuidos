@@ -15,9 +15,9 @@ pip install -r requirements.txt
 Editar `config/config.json` y ajustar las IPs reales de las VMs:
 
 ```json
-"pc1_ip": "192.168.1.10",
-"pc2_ip": "192.168.1.20",
-"pc3_ip": "192.168.1.30"
+"pc1_ip": "10.43.99.136",
+"pc2_ip": "10.43.99.139",
+"pc3_ip": "10.43.97.251"
 ```
 
 ## Inicializar bases de datos
