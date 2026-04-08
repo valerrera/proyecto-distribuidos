@@ -82,8 +82,9 @@ class ServicioAnalitica:
             self.sub_socket.setsockopt(zmq.SUBSCRIBE, topico.encode())
 
         # PUSH — envía comandos al servicio de semáforos (mismo PC2)
+        # Semáforos hace bind; analítica se conecta a él.
         self.push_semaforos = self.context.socket(zmq.PUSH)
-        self.push_semaforos.bind(f"tcp://*:{p['analitica_push_semaforos']}")
+        self.push_semaforos.connect(f"tcp://{pc2}:{p['analitica_push_semaforos']}")
 
         # PUSH — envía eventos a BD principal (PC3)
         self.push_bd = self.context.socket(zmq.PUSH)
@@ -276,22 +277,23 @@ class ServicioAnalitica:
     def _health_check_pc3(self):
         """
         Hilo que verifica periódicamente si PC3 sigue disponible.
-        Usa un socket REQ/REP dedicado para el ping.
+        Crea un socket REQ nuevo en cada ping para evitar que el socket
+        quede en estado corrupto tras un timeout (limitación de ZMQ REQ).
         """
-        p       = self.red['puertos']
-        pc3     = self.red['pc3_ip']
-        timeout = self.config['base_datos']['health_check_timeout_seg'] * 1000
+        p         = self.red['puertos']
+        pc3       = self.red['pc3_ip']
+        timeout   = self.config['base_datos']['health_check_timeout_seg'] * 1000
         intervalo = self.config['base_datos']['health_check_intervalo_seg']
-
-        socket_ping = self.context.socket(zmq.REQ)
-        socket_ping.setsockopt(zmq.RCVTIMEO, timeout)
-        socket_ping.setsockopt(zmq.SNDTIMEO, timeout)
-        socket_ping.connect(f"tcp://{pc3}:{p['health_check']}")
 
         logger.info(f"Health check PC3 iniciado (cada {intervalo}s)")
 
         while True:
             time.sleep(intervalo)
+            socket_ping = self.context.socket(zmq.REQ)
+            socket_ping.setsockopt(zmq.RCVTIMEO, timeout)
+            socket_ping.setsockopt(zmq.SNDTIMEO, timeout)
+            socket_ping.setsockopt(zmq.LINGER, 0)
+            socket_ping.connect(f"tcp://{pc3}:{p['health_check']}")
             try:
                 socket_ping.send_string('PING')
                 respuesta = socket_ping.recv_string()
@@ -310,6 +312,8 @@ class ServicioAnalitica:
                     self._pc3_disponible = False
             except Exception as e:
                 logger.error(f"Error en health check: {e}")
+            finally:
+                socket_ping.close()
 
     # ── Indicaciones directas del monitoreo ──────────────────────────────────
 

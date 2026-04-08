@@ -1,63 +1,110 @@
 # Gestión Inteligente de Tráfico Urbano
 **Pontificia Universidad Javeriana — Sistemas Distribuidos 2026-10**
 
-## Requisitos
+## IPs de las máquinas
 
-- Python 3.11+
-- pyzmq
+| Máquina | IP            |
+|---------|---------------|
+| PC1     | 10.43.99.136  |
+| PC2     | 10.43.99.139  |
+| PC3     | 10.43.97.251  |
+
+Si las IPs cambian, editar `config/config.json`.
+
+---
+
+## Paso 0 — Instalar dependencias (en las 3 máquinas)
 
 ```bash
-pip install -r requirements.txt
+pip3 install pyzmq
 ```
 
-## Configuración de IPs
+---
 
-Editar `config/config.json` y ajustar las IPs reales de las VMs:
+## Paso 1 — Inicializar las bases de datos (hacer UNA SOLA VEZ)
 
-```json
-"pc1_ip": "192.168.1.10",
-"pc2_ip": "192.168.1.20",
-"pc3_ip": "192.168.1.30"
-```
-
-## Inicializar bases de datos
-
-**En PC3:**
+**En PC3** — crea la BD principal:
 ```bash
-python db/init_db.py --solo-principal
+python3 db/init_db.py --solo-principal
 ```
 
-**En PC2:**
+**En PC2** — crea la BD réplica:
 ```bash
-python db/init_db.py --solo-replica
+python3 db/init_db.py --solo-replica
 ```
 
-## Orden de arranque
+---
 
-### PC3 (primero)
+## Paso 2 — Arrancar PC3
+
+Abrir **1 terminal** en PC3 y ejecutar:
+
 ```bash
-python pc3/base_datos.py
-python pc3/monitoreo.py
+python3 pc3/base_datos.py
 ```
 
-### PC2 (segundo)
+Dejar esa terminal corriendo. Debe mostrar:
+`BD principal lista. Esperando eventos...`
+
+---
+
+## Paso 3 — Arrancar PC2
+
+Abrir **3 terminales** en PC2, una por proceso:
+
+**Terminal 1:**
 ```bash
-python pc2/bd_replica.py
-python pc2/semaforos.py
-python pc2/analitica.py
+python3 pc2/bd_replica.py
 ```
+Debe mostrar: `Réplica lista. Esperando eventos...`
 
-### PC1 (último)
+**Terminal 2:**
 ```bash
-python pc1/broker.py
-
-# En terminales separadas, un proceso por sensor:
-python pc1/sensor_camara.py CAM-A1 INT_A1
-python pc1/sensor_espira.py ESP-A1 INT_A1
-python pc1/sensor_gps.py    GPS-A1 INT_A1
-
-# Repetir para las intersecciones deseadas
+python3 pc2/semaforos.py
 ```
+Debe mostrar: `Esperando comandos en puerto :5556`
+
+**Terminal 3:**
+```bash
+python3 pc2/analitica.py
+```
+Debe mostrar: `Servicio de analítica iniciado.`
+
+---
+
+## Paso 4 — Arrancar PC1
+
+Abrir **4 terminales** en PC1 (o más si se usan más sensores):
+
+**Terminal 1 — Broker:**
+```bash
+python3 pc1/broker.py
+```
+Debe mostrar: `Broker iniciado | SUB en :5554 | PUB en :5555`
+
+**Terminal 2 — Sensor cámara:**
+```bash
+python3 pc1/sensor_camara.py CAM-A1 INT_A1
+```
+
+**Terminal 3 — Sensor espira:**
+```bash
+python3 pc1/sensor_espira.py ESP-A1 INT_A1
+```
+
+**Terminal 4 — Sensor GPS:**
+```bash
+python3 pc1/sensor_gps.py GPS-A1 INT_A1
+```
+
+> Se pueden lanzar sensores en más intersecciones repitiendo los comandos con IDs distintos, por ejemplo:
+> ```bash
+> python3 pc1/sensor_camara.py CAM-B3 INT_B3
+> python3 pc1/sensor_espira.py ESP-B3 INT_B3
+> python3 pc1/sensor_gps.py    GPS-B3 INT_B3
+> ```
+
+---
 
 ## Estructura de la ciudad
 
@@ -71,21 +118,27 @@ C  INT_C1 INT_C2 INT_C3 INT_C4 INT_C5
 D  INT_D1 INT_D2 INT_D3 INT_D4 INT_D5
 ```
 
+Cada intersección tiene un semáforo y 3 sensores (cámara, espira, GPS).
+
+---
+
 ## Simular falla de PC3
 
-Detener los procesos en PC3. El sistema detecta la falla
-automáticamente vía health check y redirige la persistencia
-a la BD réplica en PC2 sin intervención manual.
+Detener el proceso `base_datos.py` en PC3 (Ctrl+C).  
+La analítica detecta la falla automáticamente mediante health check
+y redirige toda la persistencia a la BD réplica en PC2.
+El sistema sigue funcionando sin intervención manual.
+
+---
 
 ## Puertos ZMQ
 
 | Puerto | Uso |
 |--------|-----|
-| 5554   | Broker SUB (sensores → broker) |
-| 5555   | Broker PUB (broker → analítica) |
-| 5556   | Analítica → Semáforos PUSH/PULL |
-| 5557   | Analítica → BD principal PUSH/PULL |
-| 5558   | Analítica → BD réplica PUSH/PULL |
-| 5560   | Monitoreo REQ/REP (usuario) |
-| 5561   | Analítica REP (indicaciones directas) |
+| 5554   | Broker SUB — sensores publican aquí |
+| 5555   | Broker PUB — analítica se suscribe aquí |
+| 5556   | Semáforos PULL — analítica envía comandos aquí |
+| 5557   | BD principal PULL — analítica envía eventos aquí |
+| 5558   | BD réplica PULL — analítica envía eventos aquí |
+| 5561   | Analítica REP — reservado para monitoreo (2ª entrega) |
 | 5562   | Health check PC3 |
