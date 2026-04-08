@@ -103,18 +103,19 @@ class BaseDatos:
                 msg = self.health_socket.recv_string()
                 if msg == 'PING':
                     self.health_socket.send_string('PONG')
+                    logger.debug("Health check: PING recibido → PONG enviado")
             except Exception as e:
                 logger.error(f"Error en health check: {e}")
 
     def _persistir(self, datos: dict):
-        """Persiste un evento en la BD principal."""
+        """Persiste un evento en la BD principal e imprime un resumen detallado."""
         tipo = datos.get('tipo_sensor') or datos.get('tipo', '')
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         ts = datos.get('timestamp') or datos.get('timestamp_fin') or self._ts()
 
         try:
-            if tipo in ('camara', 'espira_inductiva', 'gps'):
+            if tipo == 'camara':
                 cursor.execute(
                     """INSERT INTO eventos_sensores
                        (sensor_id, tipo_sensor, interseccion, timestamp,
@@ -124,17 +125,82 @@ class BaseDatos:
                        VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
                     (
                         datos.get('sensor_id'),
-                        datos.get('tipo_sensor'),
+                        tipo,
                         datos.get('interseccion'),
                         ts,
                         datos.get('volumen'),
                         datos.get('velocidad_promedio'),
+                        None, None, None, None, None
+                    )
+                )
+                logger.info(
+                    f"[BD] CAMARA  | {datos.get('interseccion'):8s} | "
+                    f"sensor={datos.get('sensor_id')} | "
+                    f"cola={datos.get('volumen')} veh | "
+                    f"vel={datos.get('velocidad_promedio')} km/h | "
+                    f"ts={ts}"
+                )
+
+            elif tipo == 'espira_inductiva':
+                cursor.execute(
+                    """INSERT INTO eventos_sensores
+                       (sensor_id, tipo_sensor, interseccion, timestamp,
+                        volumen, velocidad_promedio,
+                        vehiculos_contados, intervalo_segundos,
+                        timestamp_inicio, timestamp_fin, nivel_congestion)
+                       VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+                    (
+                        datos.get('sensor_id'),
+                        tipo,
+                        datos.get('interseccion'),
+                        ts,
+                        None, None,
                         datos.get('vehiculos_contados'),
                         datos.get('intervalo_segundos'),
                         datos.get('timestamp_inicio'),
                         datos.get('timestamp_fin'),
+                        None
+                    )
+                )
+                logger.info(
+                    f"[BD] ESPIRA  | {datos.get('interseccion'):8s} | "
+                    f"sensor={datos.get('sensor_id')} | "
+                    f"conteo={datos.get('vehiculos_contados')} veh | "
+                    f"intervalo={datos.get('intervalo_segundos')}s | "
+                    f"ts={ts}"
+                )
+
+            elif tipo == 'gps':
+                cursor.execute(
+                    """INSERT INTO eventos_sensores
+                       (sensor_id, tipo_sensor, interseccion, timestamp,
+                        volumen, velocidad_promedio,
+                        vehiculos_contados, intervalo_segundos,
+                        timestamp_inicio, timestamp_fin, nivel_congestion)
+                       VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+                    (
+                        datos.get('sensor_id'),
+                        tipo,
+                        datos.get('interseccion'),
+                        ts,
+                        None,
+                        datos.get('velocidad_promedio'),
+                        None, None, None, None,
                         datos.get('nivel_congestion')
                     )
+                )
+                nivel = datos.get('nivel_congestion', '?')
+                nivel_fmt = (
+                    f"ALTA  " if nivel == 'ALTA'   else
+                    f"NORMAL" if nivel == 'NORMAL' else
+                    f"BAJA  "
+                )
+                logger.info(
+                    f"[BD] GPS     | {datos.get('interseccion'):8s} | "
+                    f"sensor={datos.get('sensor_id')} | "
+                    f"vel={datos.get('velocidad_promedio')} km/h | "
+                    f"congestion={nivel_fmt} | "
+                    f"ts={ts}"
                 )
 
             elif tipo == 'decision':
@@ -150,12 +216,22 @@ class BaseDatos:
                         datos.get('origen', 'automatico')
                     )
                 )
+                logger.info(
+                    f"[BD] DECISION| {datos.get('interseccion'):8s} | "
+                    f"condicion={datos.get('condicion'):12s} | "
+                    f"accion={datos.get('accion')} | "
+                    f"origen={datos.get('origen', 'automatico')} | "
+                    f"ts={ts}"
+                )
+
+            else:
+                logger.warning(f"[BD] Tipo de evento desconocido: '{tipo}' — ignorado")
+                return
 
             conn.commit()
-            logger.debug(f"Persistido [{tipo}] — {datos.get('interseccion')}")
 
         except sqlite3.Error as e:
-            logger.error(f"Error BD: {e}")
+            logger.error(f"[BD] Error al persistir [{tipo}]: {e}")
             conn.rollback()
         finally:
             conn.close()
