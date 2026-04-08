@@ -122,6 +122,36 @@ Cada intersección tiene un semáforo y 3 sensores (cámara, espira, GPS).
 
 ---
 
+## Consultar las bases de datos desde terminal
+
+### En PC3 — BD principal (`db/trafico_principal.db`)
+
+```bash
+# Últimos 10 eventos de sensores recibidos
+sqlite3 db/trafico_principal.db "SELECT * FROM eventos_sensores ORDER BY id DESC LIMIT 10;"
+
+# Estado actual de todos los semáforos
+sqlite3 db/trafico_principal.db "SELECT * FROM estado_semaforos;"
+
+# Últimas decisiones de analítica (NORMAL / CONGESTION / PRIORIZACION)
+sqlite3 db/trafico_principal.db "SELECT * FROM decisiones_analitica ORDER BY id DESC LIMIT 10;"
+
+# Total de eventos almacenados
+sqlite3 db/trafico_principal.db "SELECT COUNT(*) FROM eventos_sensores;"
+```
+
+### En PC2 — BD réplica (`db/trafico_replica.db`)
+
+```bash
+# Mismas consultas pero apuntando a la réplica:
+sqlite3 db/trafico_replica.db "SELECT * FROM eventos_sensores ORDER BY id DESC LIMIT 10;"
+sqlite3 db/trafico_replica.db "SELECT * FROM estado_semaforos;"
+sqlite3 db/trafico_replica.db "SELECT * FROM decisiones_analitica ORDER BY id DESC LIMIT 10;"
+sqlite3 db/trafico_replica.db "SELECT COUNT(*) FROM eventos_sensores;"
+```
+
+---
+
 ## Simular falla de PC3
 
 Detener el proceso `base_datos.py` en PC3 (Ctrl+C).  
